@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>Atlas · 活的认知体 | The Living Cognitive Entity</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body {
+      font-family: 'Segoe UI', 'Inter', system-ui, -apple-system, sans-serif;
+      background: #050510;
+      color: #e0e0e0;
+      overflow-x: hidden;
+      min-height: 100vh;
+    }
+    /* 星空粒子背景 */
+    #particles {
+      position: fixed; top:0; left:0; width:100%; height:100%; z-index:0;
+      pointer-events: none;
+    }
+    .particle {
+      position: absolute;
+      background: white;
+      border-radius: 50%;
+      opacity: 0.3;
+      animation: float linear infinite;
+    }
+    @keyframes float {
+      0% { transform: translateY(0) translateX(0); opacity: 0.3; }
+      50% { opacity: 0.7; }
+      100% { transform: translateY(-100vh) translateX(50px); opacity: 0; }
+    }
+    #app {
+      position: relative; z-index: 1;
+      max-width: 1400px; margin: 0 auto; padding: 20px;
+    }
+    /* 导航 */
+    nav {
+      display: flex; justify-content: center; flex-wrap: wrap;
+      gap: 12px; margin-bottom: 30px;
+    }
+    nav button {
+      background: rgba(255,255,255,0.05);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.1);
+      color: #a0a0b0;
+      padding: 12px 28px;
+      border-radius: 40px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+      letter-spacing: 0.5px;
+    }
+    nav button.active {
+      background: #00d4ff;
+      color: #050510;
+      border-color: #00d4ff;
+      box-shadow: 0 0 25px #00d4ff60;
+    }
+    nav button:hover { border-color: #00d4ff; color: #00d4ff; }
+    /* 场景容器 */
+    .scene {
+      display: none;
+      animation: fadeUp 0.6s ease;
+    }
+    .scene.active { display: block; }
+    @keyframes fadeUp {
+      from { opacity:0; transform: translateY(20px); }
+      to { opacity:1; transform: translateY(0); }
+    }
+    /* 画布区域 */
+    .canvas-container {
+      background: rgba(10,10,30,0.7);
+      backdrop-filter: blur(10px);
+      border-radius: 24px;
+      border: 1px solid rgba(255,255,255,0.08);
+      overflow: hidden;
+      margin-bottom: 20px;
+      position: relative;
+    }
+    canvas { display:block; width:100%; height:500px; }
+    .controls {
+      display: flex; flex-wrap: wrap; gap: 10px; padding: 20px;
+      justify-content: center;
+    }
+    .btn {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      color: #d0d0e0;
+      padding: 12px 24px;
+      border-radius: 30px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: 0.2s;
+      font-size: 0.9rem;
+      backdrop-filter: blur(5px);
+    }
+    .btn:hover { background: rgba(0,212,255,0.15); border-color: #00d4ff; color: #00d4ff; }
+    .btn.accent { background: #00d4ff; color:#050510; border-color:#00d4ff; }
+    .btn.danger { background: #ef4444; color:white; border-color:#ef4444; }
+    /* 状态与日志 */
+    .status {
+      padding: 12px 20px; border-radius: 12px;
+      background: rgba(0,0,0,0.4); font-weight: 500;
+      margin: 0 20px 20px; text-align: center;
+    }
+    .log {
+      background: rgba(0,0,0,0.5); margin:0 20px 20px; padding: 16px;
+      border-radius: 12px; height: 160px; overflow-y: auto;
+      font-family: 'JetBrains Mono', monospace; font-size: 0.8rem;
+      color: #a0a0c0;
+    }
+    /* 博弈论输入 */
+    textarea {
+      width: 100%; height: 150px;
+      background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.1);
+      color: #e0e0e0; padding: 16px; border-radius: 16px;
+      font-size: 0.9rem; resize: vertical;
+    }
+    /* 棋盘 */
+    .chess-board {
+      display: grid; grid-template-columns: repeat(8, 1fr);
+      width: 360px; height: 360px; margin: 20px auto;
+      border: 2px solid #4a4a5a; border-radius: 8px; overflow: hidden;
+    }
+    .cell {
+      display: flex; align-items: center; justify-content: center;
+      font-size: 2rem; cursor: pointer; user-select: none;
+    }
+    .cell.light { background: #e8e8e8; }
+    .cell.dark { background: #769656; }
+    .cell.selected { box-shadow: inset 0 0 0 3px #00d4ff; }
+    /* 文件上传 */
+    .file-zone {
+      border: 2px dashed rgba(255,255,255,0.2);
+      border-radius: 20px; padding: 40px; text-align: center;
+      cursor: pointer; transition: 0.2s;
+    }
+    .file-zone:hover { border-color: #00d4ff; background: rgba(0,212,255,0.05); }
+    /* 响应式 */
+    @media (max-width: 768px) {
+      .canvas-container canvas { height: 350px; }
+      .chess-board { width: 280px; height: 280px; }
+    }
+  </style>
+</head>
+<body>
+<!-- 粒子背景 -->
+<div id="particles"></div>
+
+<div id="app">
+  <!-- 导航 -->
+  <nav>
+    <button class="active" data-scene="1">🔷 数学骨架</button>
+    <button data-scene="2">🧠 吸收博弈论</button>
+    <button data-scene="3">♟️ 棋盘征服</button>
+    <button data-scene="4">📤 知识重构</button>
+  </nav>
+
+  <!-- ========= 第一幕 ========= -->
+  <div id="scene1" class="scene active">
+    <div class="canvas-container">
+      <canvas id="canvas1"></canvas>
+    </div>
+    <div class="controls">
+      <button class="btn" onclick="action('focus')">📍 聚焦</button>
+      <button class="btn" onclick="action('unfold')">📂 展开</button>
+      <button class="btn" onclick="action('fold')">📦 折叠</button>
+      <button class="btn" onclick="action('connect')">🔗 连接</button>
+      <button class="btn danger" onclick="action('selfloop')">⚠️ 自环</button>
+      <button class="btn" onclick="resetGraph()">🔄 重置</button>
+    </div>
+    <div class="status" id="status1">原初图 G₀ 已生成 · 两个节点，一条有向边</div>
+    <div class="log" id="log1"></div>
+  </div>
+
+  <!-- ========= 第二幕 ========= -->
+  <div id="scene2" class="scene">
+    <h2 style="text-align:center; margin:20px;">输入博弈论规则，观察重构</h2>
+    <textarea id="gtInput" placeholder="例如：
+A Nash equilibrium is a state where no player can improve by changing only their own strategy.
+In zero-sum games, one player's gain equals the other's loss.
+The minimax theorem states that in zero-sum games, there exists a value and optimal strategies."></textarea>
+    <div class="controls">
+      <button class="btn accent" onclick="absorbGT()">🧠 吸收并重构</button>
+    </div>
+    <div class="canvas-container">
+      <canvas id="canvas2"></canvas>
+    </div>
+    <div class="status" id="status2">等待规则输入</div>
+    <div class="log" id="log2"></div>
+  </div>
+
+  <!-- ========= 第三幕 ========= -->
+  <div id="scene3" class="scene">
+    <h2 style="text-align:center; margin:20px;">Atlas 博弈 · 国际象棋</h2>
+    <div class="chess-board" id="chessBoard"></div>
+    <div class="controls">
+      <button class="btn accent" onclick="startChess()">♟️ 新游戏</button>
+    </div>
+    <div class="status" id="chessStatus">点击新游戏开始</div>
+  </div>
+
+  <!-- ========= 第四幕 ========= -->
+  <div id="scene4" class="scene">
+    <h2 style="text-align:center; margin:20px;">上传任意文本文件，重构知识图谱</h2>
+    <div class="file-zone" onclick="document.getElementById('fileInput').click()">
+      <p style="font-size:1.2rem;">📁 点击选择文件</p>
+      <input type="file" id="fileInput" style="display:none" accept=".txt,.md,.pdf" onchange="handleFile()">
+    </div>
+    <div class="canvas-container">
+      <canvas id="canvas4"></canvas>
+    </div>
+    <div class="status" id="status4">等待文件</div>
+    <div class="log" id="log4"></div>
+  </div>
+</div>
+
+<script>
+// ==================== 粒子背景 ====================
+(function(){
+  const container = document.getElementById('particles');
+  for(let i=0; i<80; i++){
+    const p = document.createElement('div');
+    p.className = 'particle';
+    const size = Math.random()*3 + 1;
+    p.style.width = size+'px'; p.style.height = size+'px';
+    p.style.left = Math.random()*100+'%';
+    p.style.top = Math.random()*100+'%';
+    p.style.animationDuration = (Math.random()*10 + 10)+'s';
+    p.style.animationDelay = Math.random()*10+'s';
+    container.appendChild(p);
+  }
+})();
+
+// ==================== 导航切换 ====================
+const scenes = ['scene1','scene2','scene3','scene4'];
+document.querySelectorAll('nav button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const num = btn.dataset.scene;
+    scenes.forEach(s => document.getElementById(s).classList.remove('active'));
+    document.getElementById('scene'+num).classList.add('active');
+    if(num==='1') drawGraph1();
+    if(num==='2') drawGraph2();
+    if(num==='4') drawGraph4();
+  });
+});
+
+// ==================== 图引擎 ====================
+let nodes1 = [], edges1 = [];
+let nodes2 = [], edges2 = [];
+let nodes4 = [], edges4 = [];
+let focusId = null;
+
+function createGraph() {
+  return { nodes: [], edges: [] };
+}
+function addNode(graph, label, x, y, type=0) {
+  const id = 'n'+Date.now()+Math.random();
+  graph.nodes.push({id, x, y, label, type, active:1, collapsed:null});
+  return id;
+}
+function drawGraph(canvasId, graph, highlightContra=null) {
+  const canvas = document.getElementById(canvasId);
+  if(!canvas) return;
+  const ctx = canvas.getContext('2d');
+  canvas.width = canvas.parentElement.clientWidth;
+  canvas.height = canvas.parentElement.clientHeight || 500;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  graph.edges.forEach(e => {
+    const sn = graph.nodes.find(n=>n.id===e.src);
+    const dn = graph.nodes.find(n=>n.id===e.dst);
+    if(!sn||!dn) return;
+    ctx.beginPath();
+    if(e.contradiction) {
+      ctx.arc(sn.x, sn.y-20, 16, 0, Math.PI*2);
+      ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 3;
+    } else {
+      ctx.moveTo(sn.x, sn.y); ctx.lineTo(dn.x, dn.y);
+      ctx.strokeStyle = '#00d4ff'; ctx.lineWidth = 2;
+    }
+    ctx.stroke();
+  });
+  graph.nodes.forEach(n => {
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, 22, 0, 2*Math.PI);
+    if(n.active===2) {
+      ctx.fillStyle = '#f59e0b'; ctx.shadowColor='#f59e0b'; ctx.shadowBlur=20;
+    } else if(n.type===1) {
+      ctx.fillStyle = '#8b5cf6';
+    } else {
+      ctx.fillStyle = '#1e293b';
+    }
+    ctx.fill();
+    ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
+    ctx.strokeStyle = '#00d4ff'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = '#fff'; ctx.font = '14px monospace'; ctx.textAlign='center';
+    ctx.fillText(n.label, n.x, n.y+35);
+  });
+}
+
+// ==================== 第一幕逻辑 ====================
+function initGraph1() {
+  const g = {nodes: nodes1, edges: edges1};
+  g.nodes = []; g.edges = [];
+  const a = addNode(g, 'A', 300, 250, 0);
+  const b = addNode(g, 'B', 500, 250, 0);
+  g.edges.push({src:a, dst:b, contradiction:false});
+  nodes1 = g.nodes; edges1 = g.edges;
+  drawGraph1();
+}
+function drawGraph1(){ drawGraph('canvas1', {nodes:nodes1, edges:edges1}); }
+function action(op) {
+  const g = {nodes: nodes1, edges: edges1};
+  if(op==='focus' && nodes1.length){
+    const t = nodes1[Math.floor(Math.random()*nodes1.length)];
+    nodes1.forEach(n=>n.active=1); t.active=2; focusId=t.id;
+    log1('📍 聚焦 → '+t.label);
+  } else if(op==='unfold' && focusId) {
+    const n = nodes1.find(n=>n.id===focusId);
+    if(n && n.type===1 && n.collapsed) {
+      const sub = n.collapsed;
+      sub.nodes.forEach(sn => { if(!nodes1.find(x=>x.id===sn.id)) nodes1.push(sn); });
+      sub.edges.forEach(se => { if(!edges1.some(e=>e.src===se.src&&e.dst===se.dst)) edges1.push(se); });
+      n.collapsed=null; n.type=0;
+      log1('📂 展开标记节点');
+    } else log1('无法展开');
+  } else if(op==='fold' && nodes1.length>=3) {
+    const toFold = nodes1.slice(-2);
+    const container = {id:'n'+Date.now(), x:(toFold[0].x+toFold[1].x)/2, y:(toFold[0].y+toFold[1].y)/2, label:'定理', type:1, active:1, collapsed: {
+      nodes: JSON.parse(JSON.stringify(toFold)),
+      edges: [{src:toFold[0].id, dst:toFold[1].id, contradiction:false}]
+    }};
+    nodes1 = nodes1.filter(n => !toFold.includes(n));
+    nodes1.push(container);
+    edges1.forEach(e => { if(toFold.some(tf=>tf.id===e.src)) e.src=container.id; if(toFold.some(tf=>tf.id===e.dst)) e.dst=container.id; });
+    log1('📦 折叠为定理节点');
+  } else if(op==='connect' && nodes1.length>=2) {
+    const a=nodes1[nodes1.length-2].id, b=nodes1[nodes1.length-1].id;
+    if(a!==b) { edges1.push({src:a,dst:b,contradiction:false}); log1('🔗 连接'); }
+  } else if(op==='selfloop' && nodes1.length) {
+    const last=nodes1[nodes1.length-1].id;
+    edges1.push({src:last,dst:last,contradiction:true});
+    log1('❌ 自环被拦截！');
+    drawGraph1();
+    setTimeout(()=>{ edges1.pop(); drawGraph1(); }, 1000);
+    return;
+  }
+  drawGraph1();
+  document.getElementById('status1').textContent = focusId ? '焦点: '+focusId : '操作完成';
+}
+function resetGraph() { initGraph1(); document.getElementById('log1').innerHTML=''; }
+function log1(msg) { const l=document.getElementById('log1'); l.innerHTML+=`<div>${msg}</div>`; l.scrollTop=l.scrollHeight; }
+
+// ==================== 第二幕：博弈论重构 ====================
+function absorbGT() {
+  const input = document.getElementById('gtInput').value.trim();
+  if(!input) return;
+  nodes2=[]; edges2=[];
+  const concepts = [];
+  const lines = input.split('\n').filter(l=>l);
+  const wordSet = new Set();
+  lines.forEach(line => {
+    line.split(/\s+/).forEach(w => { if(w.length>4) wordSet.add(w); });
+  });
+  const words = Array.from(wordSet).slice(0,12);
+  words.forEach((w,i) => {
+    const angle = (i/words.length)*Math.PI*2;
+    addNode({nodes:nodes2,edges:edges2}, w, 400+Math.cos(angle)*200, 250+Math.sin(angle)*200,0);
+  });
+  for(let i=0;i<nodes2.length-1;i++) edges2.push({src:nodes2[i].id,dst:nodes2[i+1].id,contradiction:false});
+  if(nodes2.length>2) edges2.push({src:nodes2[nodes2.length-1].id, dst:nodes2[0].id, contradiction:false});
+  drawGraph2();
+  document.getElementById('status2').textContent = `重构完成：${nodes2.length} 概念，${edges2.length} 关系`;
+  document.getElementById('log2').innerHTML = `<div>提取概念：${words.join(', ')}</div>`;
+}
+function drawGraph2(){ drawGraph('canvas2', {nodes:nodes2, edges:edges2}); }
+
+// ==================== 第三幕：简化象棋 ====================
+let chessBoard = [];
+let selectedCell = null;
+function initChess() {
+  chessBoard = [
+    ['♜','♞','♝','♛','♚','♝','♞','♜'],
+    ['♟','♟','♟','♟','♟','♟','♟','♟'],
+    ['','','','','','','',''],
+    ['','','','','','','',''],
+    ['','','','','','','',''],
+    ['','','','','','','',''],
+    ['♙','♙','♙','♙','♙','♙','♙','♙'],
+    ['♖','♘','♗','♕','♔','♗','♘','♖']
+  ];
+  selectedCell = null;
+  renderChess();
+}
+function renderChess() {
+  const boardDiv = document.getElementById('chessBoard');
+  boardDiv.innerHTML = '';
+  for(let r=0; r<8; r++) {
+    for(let c=0; c<8; c++) {
+      const cell = document.createElement('div');
+      cell.className = 'cell ' + ((r+c)%2===0 ? 'light' : 'dark');
+      cell.textContent = chessBoard[r][c];
+      cell.dataset.row = r; cell.dataset.col = c;
+      cell.onclick = () => cellClick(r,c);
+      boardDiv.appendChild(cell);
+    }
+  }
+}
+function cellClick(r,c) {
+  const boardDiv = document.getElementById('chessBoard');
+  if(!selectedCell) {
+    if(chessBoard[r][c] && ['♙','♖','♘','♗','♕','♔'].includes(chessBoard[r][c])) {
+      selectedCell = {r,c};
+      document.getElementById('chessStatus').textContent = '选中：'+chessBoard[r][c]+'，请选择目标格';
+      renderChess();
+      boardDiv.children[r*8+c].classList.add('selected');
+    }
+  } else {
+    if(r===selectedCell.r && c===selectedCell.c) {
+      selectedCell = null; renderChess(); return;
+    }
+    chessBoard[r][c] = chessBoard[selectedCell.r][selectedCell.c];
+    chessBoard[selectedCell.r][selectedCell.c] = '';
+    selectedCell = null;
+    renderChess();
+    document.getElementById('chessStatus').textContent = 'Atlas 正在思考...';
+    setTimeout(()=>{
+      document.getElementById('chessStatus').textContent = '该你了';
+    },600);
+  }
+}
+function startChess() { initChess(); document.getElementById('chessStatus').textContent='新游戏开始，你执白'; }
+
+// ==================== 第四幕：文件重构 ====================
+function handleFile() {
+  const file = document.getElementById('fileInput').files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    const text = e.target.result;
+    const words = text.split(/\s+/).filter(w=>w.length>3).slice(0,15);
+    const unique = [...new Set(words)];
+    nodes4=[]; edges4=[];
+    unique.forEach((w,i)=>{
+      const angle = (i/unique.length)*Math.PI*2;
+      addNode({nodes:nodes4,edges:edges4}, w, 400+Math.cos(angle)*200, 250+Math.sin(angle)*200,0);
+    });
+    for(let i=0;i<nodes4.length-1;i++) edges4.push({src:nodes4[i].id,dst:nodes4[i+1].id,contradiction:false});
+    if(nodes4.length>2) edges4.push({src:nodes4[nodes4.length-1].id, dst:nodes4[0].id, contradiction:false});
+    drawGraph4();
+    document.getElementById('status4').textContent = `从 "${file.name}" 重构出 ${nodes4.length} 个概念`;
+    document.getElementById('log4').innerHTML = `<div>提取：${unique.join(', ')}</div>`;
+  };
+  reader.readAsText(file);
+}
+function drawGraph4(){ drawGraph('canvas4', {nodes:nodes4, edges:edges4}); }
+
+// 初始化
+initGraph1();
+</script>
+</body>
+</html>
